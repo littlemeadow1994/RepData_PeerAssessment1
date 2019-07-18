@@ -1,25 +1,163 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research Assigment 1"
+author: "Lisa van der Heijden"
+date: "18-7-2019"
+output: html_document
 ---
+# Peer feedback assignment 1 
+## Assigment 
+This assignment will be described in multiple parts. You will need to write a report that answers the questions detailed below. Ultimately, you will need to complete the entire assignment in a single R markdown document that can be processed by knitr and be transformed into an HTML file.
 
+Throughout your report make sure you always include the code that you used to generate the output you present. When writing code chunks in the R markdown document, always use echo = TRUE so that someone else will be able to read the code. This assignment will be evaluated via peer assessment so it is essential that your peer evaluators be able to review the code for your analysis.
+
+For the plotting aspects of this assignment, feel free to use any plotting system in R (i.e., base, lattice, ggplot2)
+
+Fork/clone the GitHub repository created for this assignment. You will submit this assignment by pushing your completed files into your forked repository on GitHub. The assignment submission will consist of the URL to your GitHub repository and the SHA-1 commit ID for your repository state.
+
+NOTE: The GitHub repository also contains the dataset for the assignment so you do not have to download the data separately.
 
 ## Loading and preprocessing the data
+The following code chunk will empty the global environment. This will make sure that vectors won't be overwriten or confused with one another. 
+```{R empty global environment, echo = TRUE}
+rm(list = ls())
 
+```
 
+The next step is to set the working directory. 
+```{R set working directory, echo  = TRUE}
+wd <- "~/Documents/datasciencecourse/course 5/week 2"
+setwd(wd)
+```
 
-## What is mean total number of steps taken per day?
+Continuing with the assignment, the data will be read. 
+```{R read in the data, echo = TRUE}
+dat <- read.csv("activity.csv", sep =",", header = TRUE)
+```
 
+The following code will give some information about the dataset
 
+```{R Getting to know the dat, echo = TRUE}
+dim(dat) #Show the dimensions of the dataset
+str(dat) #Returns the column names of the dataset
+head(dat) #Shows the first couple of rows of the dataset
+summary(dat, na.rm = TRUE) #Returns a 5 number summary and the mean of each column
+```
 
-## What is the average daily activity pattern?
+## First question: What is the mean total number of steps taken per day?
 
+Next, the total number of steps per day needs to be calculated. 
+```{R calculation of the mean steps per day, ECHO = TRUE}
+library(dplyr) #Load the dplyr package
 
+sumofsteps <- dat %>% group_by(date) %>% summarise(sum = sum(steps, na.rm = TRUE))
 
-## Imputing missing values
+```
 
+The following code will make a histogram of the total number of steps taken per day. 
+```{R Histogram mean steps per day}
+hist(sumofsteps$sum, breaks = 8,
+     xlab = "Number of steps per day", ylab = "Count", main = "The total number of steps taken per day")
+```
 
+The following code will calculate the mean and median of the total steps taken per day. 
+```{R mean and median of total steps per day, echo = TRUE}
+meansteps <- mean(sumofsteps$sum, na.rm=TRUE)
+mediansteps <- median(sumofsteps$sum, na.rm = TRUE)
 
-## Are there differences in activity patterns between weekdays and weekends?
+```
+
+The mean of the total number of steps per day is `r meansteps`. The median of the total number of steps per day is `r mediansteps`. 
+
+## Second question: What is the average daily activity pattern?
+The visualise the average daily activity pattern, the mean number of steps per time interval must be calculated. 
+```{R Mean number of steps per interval, echo = TRUE}
+dailyactivity <- dat %>% group_by(interval) %>% summarise(mean = mean(steps, na.rm = TRUE))
+
+```
+
+Next code chunk will present the code to make the plot
+```{R plot mean number of steps per interval, echo = TRUE}
+library(ggplot2)
+ggplot(data = dailyactivity, aes(x = interval, y = mean))+
+        geom_line()+
+        xlab("5 minute time interval")+
+        ylab("Mean number of steps")+
+        ggtitle("The average number of steps per time interval")+
+        theme_bw()
+```
+
+The following code finds the interval with the maximum of the average of taken steps per time interval. 
+```{R time interval with the maximum mean number of steps, echo = TRUE}
+interval <- dailyactivity$interval[dailyactivity$mean == max(dailyactivity$mean, na.rm = TRUE)]
+```
+Interval `r interval` has on average across all the days in the data, the maximum number of steps. 
+
+## Third question: Imputing missing values
+```{R computing the number of missing values, echo = TRUE}
+missingvalues <- sum(is.na(dat))
+```
+The total number of missing values is `r missingvalues`. 
+
+The missing values will be imputed with the mean value of the interval
+```{R imputing of missing values, echo = TRUE}
+nonNadat <- dat %>% 
+        group_by(interval) %>%
+        mutate(steps = ifelse(is.na(steps), 
+                                 mean(steps, na.rm = TRUE),
+                                 steps)
+               )
+str(nonNadat)
+```
+
+The following code will make a histogram of the total number of steps taken each day. And it will calculate the mean and median of the total number of steps taken per day.
+```{R Histogram mean steps per day without NA, echo = TRUE}
+nonNAtotalsteps <- nonNadat %>%
+        group_by(date) %>%
+        summarise(total = sum(steps))
+
+hist(nonNAtotalsteps$total, breaks = 8,
+     xlab = "Number of steps per day", ylab = "Count", main = "The total number of steps taken per day")
+
+nonNAmeansteps <- mean(sumofsteps$sum, na.rm=TRUE)
+nonNAmediansteps <- median(sumofsteps$sum, na.rm = TRUE)
+
+```
+The mean of the total number of steps per day is `r nonNAmeansteps`. The median of the total number of steps per day is `r nonNAmediansteps`. These values do not differ from the previous calculations. The influence of the imputing is that the distribution becomes more normalised. 
+
+## Fourth question: Are there differences in activity patterns between weekdays and weekends
+The following code creates a new variable in the dataset with two levels: "weekdays" and "weekend" indicating whether a given data is a weekday or weekend day. 
+
+```{R transformation of the class of the data variable, echo = TRUE}
+dates <- as.character(nonNadat$date)
+dates <- as.Date(dates, format = "%Y-%m-%d")
+```
+
+```{R create a new variable distinguishing weekdays from weekend days, echo = TRUE}
+days <- weekdays(dates)
+weekendays <- c("Saturday", "Sunday")
+weekorweekend <- ifelse(days == "Saturday", "Weekend", ifelse(
+                days == "Sunday", "Weekend",
+                "Weekday")
+        )
+```
+
+```{R add the new variable to the dataset, echo = TRUE}
+nonNadat$weekend <- weekorweekend
+```
+
+The following code will create a plot containing time series plot (i.e. 
+type = "l"") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). 
+```{R Creation of the plot, echo = TRUE}
+datperweekend <- nonNadat %>% 
+                group_by(weekend, interval) %>%
+                summarise(average = mean(steps)) #Calculate the mean number of steps per interval and weekdays or weekendays
+
+ggplot(data  = datperweekend, aes(x = interval, y = average))+
+        geom_line()+
+        facet_grid(weekend ~ .)+
+        xlab("5-minute interval")+
+        ylab("Average number of steps")+
+        ggtitle("Average number of steps taken on weekdays or in the weekend")+
+        theme_bw()
+
+```
